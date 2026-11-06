@@ -1,0 +1,123 @@
+# Запросы к /coffees для встроенного HTTP Client в IntelliJ IDEA.
+# Запусти приложение (SburrestdemoApplication), затем жми ▶ у запроса
+# или «Run All Requests in File» — запросы идут сверху вниз и передают id друг другу.
+
+@host = http://localhost:8080
+
+### 1. Список всех кофе (запоминаем id первого)
+GET {{host}}/coffees
+
+> {%
+    client.test("200 и непустой список", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body.length >= 1, "список пуст");
+    });
+    client.global.set("firstId", response.body[0].id);
+%}
+
+### 2. Кофе по id
+GET {{host}}/coffees/{{firstId}}
+
+> {%
+    client.test("200 и тот же id", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body.id === client.global.get("firstId"), "id не совпал");
+    });
+%}
+
+### 3. Кофе по несуществующему id → 404
+GET {{host}}/coffees/no-such-id
+
+> {%
+    client.test("404", function () {
+        client.assert(response.status === 404, "ожидали 404, получили " + response.status);
+    });
+%}
+
+### 4. Создание (id в теле игнорируется, сервер выдаёт свой)
+POST {{host}}/coffees
+Content-Type: application/json
+
+{
+  "name": "Kaffa"
+}
+
+> {%
+    client.test("201 и сгенерированный id", function () {
+        client.assert(response.status === 201, "ожидали 201, получили " + response.status);
+        client.assert(response.body.name === "Kaffa", "имя не совпало");
+    });
+    client.global.set("newId", response.body.id);
+%}
+
+### 5. Создание с пустым именем → 400
+POST {{host}}/coffees
+Content-Type: application/json
+
+{
+  "name": ""
+}
+
+> {%
+    client.test("400", function () {
+        client.assert(response.status === 400, "ожидали 400, получили " + response.status);
+    });
+%}
+
+### 6. Обновление существующего → 200
+PUT {{host}}/coffees/{{newId}}
+Content-Type: application/json
+
+{
+  "name": "Kaffa Reserve"
+}
+
+> {%
+    client.test("200 и новое имя при прежнем id", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body.id === client.global.get("newId"), "id изменился");
+        client.assert(response.body.name === "Kaffa Reserve", "имя не обновилось");
+    });
+%}
+
+### 7. PUT по неизвестному id создаёт запись → 201
+PUT {{host}}/coffees/my-own-id
+Content-Type: application/json
+
+{
+  "name": "Created via PUT"
+}
+
+> {%
+    client.test("201 и заданный id", function () {
+        client.assert(response.status === 201, "ожидали 201, получили " + response.status);
+        client.assert(response.body.id === "my-own-id", "id не совпал");
+    });
+%}
+
+### 8. Удаление → 204
+DELETE {{host}}/coffees/{{newId}}
+
+> {%
+    client.test("204", function () {
+        client.assert(response.status === 204, "ожидали 204, получили " + response.status);
+    });
+%}
+
+### 9. После удаления → 404
+GET {{host}}/coffees/{{newId}}
+
+> {%
+    client.test("404", function () {
+        client.assert(response.status === 404, "ожидали 404, получили " + response.status);
+    });
+%}
+
+### 10. Уборка: удаляем запись из шага 7, чтобы сценарий можно было гонять повторно
+DELETE {{host}}/coffees/my-own-id
+
+> {%
+    client.test("204", function () {
+        client.assert(response.status === 204, "ожидали 204, получили " + response.status);
+    });
+%}
