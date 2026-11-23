@@ -60,9 +60,12 @@ GET {{host}}/actuator
 GET {{host}}/actuator/configprops
 
 > {%
-    client.test("200 и greeting в configprops", function () {
+    client.test("200 и оба префикса в configprops", function () {
         client.assert(response.status === 200, "ожидали 200, получили " + response.status);
-        client.assert(JSON.stringify(response.body).includes("greeting"), "greeting не найден");
+        var prefixes = Object.values(response.body.contexts.sburrestdemo.beans)
+                .map(function (bean) { return bean.prefix; });
+        client.assert(prefixes.indexOf("greeting") !== -1, "greeting не найден: " + prefixes.join(", "));
+        client.assert(prefixes.indexOf("droid") !== -1, "droid не найден: " + prefixes.join(", "));
     });
 %}
 

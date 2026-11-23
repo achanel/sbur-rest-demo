@@ -9,7 +9,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -80,6 +80,7 @@ class ConfigurationAndActuatorTests {
     void actuatorConfigPropsIsExposed() throws Exception {
         mvc.perform(get("/actuator/configprops"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("greeting")));
+                .andExpect(jsonPath("$.contexts.sburrestdemo.beans.*.prefix")
+                        .value(hasItems("greeting", "droid")));
     }
 }
