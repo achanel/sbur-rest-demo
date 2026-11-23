@@ -1,0 +1,77 @@
+# Запросы главы 5: конфигурация через @ConfigurationProperties и Actuator.
+# Запусти приложение (SburrestdemoApplication), затем жми ▶ у запроса
+# или «Run All Requests in File».
+
+@host = http://localhost:8080
+
+### 1. Приветствие из application.properties (greeting.name)
+GET {{host}}/greeting
+
+> {%
+    client.test("200 и имя из конфигурации", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body === "Dakota", "имя не совпало: " + response.body);
+    });
+%}
+
+### 2. Приветствие с кофе: плейсхолдер ${greeting.name} раскрыт
+GET {{host}}/greeting/coffee
+
+> {%
+    client.test("200 и раскрытый плейсхолдер", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body === "Dakota is drinking Cafe Cereza", "текст не совпал: " + response.body);
+    });
+%}
+
+### 3. Droid как бин с @ConfigurationProperties(prefix = "droid")
+GET {{host}}/droid
+
+> {%
+    client.test("200 и поля из конфигурации", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body.id === "BB-8", "id не совпал: " + response.body.id);
+        client.assert(response.body.description.includes("rolling android"), "описание не совпало");
+    });
+%}
+
+### 4. Actuator: health с деталями (show-details=always)
+GET {{host}}/actuator/health
+
+> {%
+    client.test("200, UP и components", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body.status === "UP", "статус не UP: " + response.body.status);
+        client.assert(response.body.components !== undefined, "нет components — детали скрыты");
+    });
+%}
+
+### 5. Actuator: список эндпоинтов (exposure.include=*)
+GET {{host}}/actuator
+
+> {%
+    client.test("200 и configprops среди эндпоинтов", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body._links.configprops !== undefined, "configprops не опубликован");
+    });
+%}
+
+### 6. Actuator: привязка конфигурации
+GET {{host}}/actuator/configprops
+
+> {%
+    client.test("200 и greeting в configprops", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(JSON.stringify(response.body).includes("greeting"), "greeting не найден");
+    });
+%}
+
+### 7. Actuator: условия автоконфигурации (глава про инспекцию)
+GET {{host}}/actuator/conditions
+
+> {%
+    client.test("200 и отчет об условиях", function () {
+        client.assert(response.status === 200, "ожидали 200, получили " + response.status);
+        client.assert(response.body.contexts !== undefined, "нет contexts — отчет пуст");
+    });
+%}
