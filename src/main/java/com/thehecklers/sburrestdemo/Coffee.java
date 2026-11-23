@@ -1,16 +1,39 @@
 package com.thehecklers.sburrestdemo;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+
 import java.util.UUID;
 
-public record Coffee(String id, String name) {
+@Entity
+public class Coffee {
 
-    public Coffee {
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("name must not be blank");
-        }
+    @Id
+    private String id;
+    private String name;
+
+    protected Coffee() {
+        // for JPA
     }
 
-    public Coffee(String name) {
+    Coffee(String name) {
         this(UUID.randomUUID().toString(), name);
+    }
+
+    Coffee(String id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    void rename(String name) {
+        this.name = name;
     }
 }

@@ -3,10 +3,17 @@ package com.thehecklers.sburrestdemo;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
+import java.util.stream.StreamSupport;
+
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,29 +21,37 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@SpringBootTest
+@Transactional
 class RestApiDemoControllerTests {
+
+    @Autowired
+    private CoffeeRepository coffees;
 
     private MockMvc mvc;
 
     @BeforeEach
-    void setUp() {
-        mvc = MockMvcBuilders.standaloneSetup(new RestApiDemoController()).build();
+    void setUp(WebApplicationContext context) {
+        mvc = MockMvcBuilders.webAppContextSetup(context).build();
     }
 
     @Test
-    void getCoffeesReturnsSeededCoffeesInInsertionOrder() throws Exception {
+    void getCoffeesReturnsSeededCoffees() throws Exception {
         mvc.perform(get("/coffees"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(4))
-                .andExpect(jsonPath("$[0].name").value("Café Cereza"))
-                .andExpect(jsonPath("$[3].name").value("Café Três Pontas"))
+                .andExpect(jsonPath("$[*].name").value(containsInAnyOrder(
+                        "Café Cereza", "Café Ganador", "Café Lareño", "Café Três Pontas")))
                 .andExpect(jsonPath("$[*].id").isNotEmpty());
     }
 
     @Test
     void getCoffeeByIdReturnsExistingCoffee() throws Exception {
-        mvc.perform(get("/coffees/{id}", firstCoffeeId()))
+        String id = coffeeId("Café Cereza");
+
+        mvc.perform(get("/coffees/{id}", id))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.name").value("Café Cereza"));
     }
 
@@ -81,7 +96,7 @@ class RestApiDemoControllerTests {
 
     @Test
     void putCoffeeUpdatesExistingCoffee() throws Exception {
-        String id = firstCoffeeId();
+        String id = coffeeId("Café Cereza");
 
         mvc.perform(put("/coffees/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -93,8 +108,7 @@ class RestApiDemoControllerTests {
         mvc.perform(get("/coffees/{id}", id))
                 .andExpect(jsonPath("$.name").value("Café Renamed"));
         mvc.perform(get("/coffees"))
-                .andExpect(jsonPath("$.length()").value(4))
-                .andExpect(jsonPath("$[0].id").value(id));
+                .andExpect(jsonPath("$.length()").value(4));
     }
 
     @Test
@@ -112,7 +126,7 @@ class RestApiDemoControllerTests {
 
     @Test
     void putCoffeeRejectsBlankNameAndKeepsExistingCoffee() throws Exception {
-        String id = firstCoffeeId();
+        String id = coffeeId("Café Cereza");
 
         mvc.perform(put("/coffees/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -125,7 +139,7 @@ class RestApiDemoControllerTests {
 
     @Test
     void deleteCoffeeRemovesCoffeeAndIsIdempotent() throws Exception {
-        String id = firstCoffeeId();
+        String id = coffeeId("Café Cereza");
 
         mvc.perform(delete("/coffees/{id}", id))
                 .andExpect(status().isNoContent());
@@ -138,9 +152,11 @@ class RestApiDemoControllerTests {
                 .andExpect(status().isNoContent());
     }
 
-    private String firstCoffeeId() throws Exception {
-        String body = mvc.perform(get("/coffees"))
-                .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(body, "$[0].id");
+    private String coffeeId(String name) {
+        return StreamSupport.stream(coffees.findAll().spliterator(), false)
+                .filter(coffee -> coffee.getName().equals(name))
+                .findFirst()
+                .orElseThrow()
+                .getId();
     }
 }

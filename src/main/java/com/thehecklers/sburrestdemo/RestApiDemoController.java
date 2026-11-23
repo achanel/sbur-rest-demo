@@ -12,55 +12,50 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Stream;
 
 @RestController
 @RequestMapping("/coffees")
 class RestApiDemoController {
 
-    private final Map<String, Coffee> coffees = Collections.synchronizedMap(new LinkedHashMap<>());
+    private final CoffeeRepository coffees;
 
-    RestApiDemoController() {
-        Stream.of("Café Cereza", "Café Ganador", "Café Lareño", "Café Três Pontas")
-                .map(Coffee::new)
-                .forEach(coffee -> coffees.put(coffee.id(), coffee));
+    RestApiDemoController(CoffeeRepository coffees) {
+        this.coffees = coffees;
     }
 
     @GetMapping
     List<Coffee> getCoffees() {
-        return new ArrayList<>(coffees.values());
+        return coffees.findAll();
     }
 
     @GetMapping("/{id}")
     ResponseEntity<Coffee> getCoffeeById(@PathVariable String id) {
-        Coffee coffee = coffees.get(id);
-        return coffee == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(coffee);
+        return coffees.findById(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    Coffee postCoffee(@RequestBody Coffee coffee) {
-        Coffee created = new Coffee(coffee.name());
-        coffees.put(created.id(), created);
-        return created;
+    Coffee postCoffee(@RequestBody CoffeeRequest request) {
+        return coffees.save(new Coffee(request.name()));
     }
 
     @PutMapping("/{id}")
-    ResponseEntity<Coffee> putCoffee(@PathVariable String id, @RequestBody Coffee coffee) {
-        Coffee updated = new Coffee(id, coffee.name());
-        return coffees.put(id, updated) == null
-                ? ResponseEntity.status(HttpStatus.CREATED).body(updated)
-                : ResponseEntity.ok(updated);
+    ResponseEntity<Coffee> putCoffee(@PathVariable String id, @RequestBody CoffeeRequest request) {
+        return coffees.findById(id)
+                .map(existing -> {
+                    existing.rename(request.name());
+                    return ResponseEntity.ok(coffees.save(existing));
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.CREATED)
+                        .body(coffees.save(new Coffee(id, request.name()))));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void deleteCoffee(@PathVariable String id) {
-        coffees.remove(id);
+        coffees.findById(id).ifPresent(coffees::delete);
     }
 }
